@@ -1,0 +1,12 @@
+{
+  "name"         : "event-agent",
+  "version"      : "0.0.1",
+  "description"  : "Event web scrapping",
+  "main"         : "event-agent.js",
+  "author"       : "jbmartin",
+  "dependencies" : {
+    "express"    : "latest",
+    "request"    : "latest",
+    "cheerio"    : "latest"
+  }
+}
