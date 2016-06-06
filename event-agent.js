@@ -5,6 +5,22 @@ var cheerio = require('cheerio');
 var app = express();
 var icalendar = require('icalendar');
 
+
+var CronJob = require('cron').CronJob;
+
+// Schedule start function : https://www.npmjs.com/package/cron
+var job = new CronJob('11 00 00 * * 1-7', function() {
+        /*TODO
+         * Scrapping execution to be done here
+         */
+    }, function () {
+        console.log('Scrapping done');
+    },
+    true, /* Start the job right now */
+    'Europe/Paris' /* Time zone of this job. */
+);
+
+
 app.get('/', function(req, res) {
 
     var events = [];
@@ -12,9 +28,28 @@ app.get('/', function(req, res) {
         parse_utc(events, function(events) {
             res.json(events);
         });
+        res.json(events);
     });
 
 });
+
+app.get('/asso', function (req, res) {
+
+    res.set('Content-Type', 'application/json');
+
+    var asso_list = [];
+    var event = [];
+    list_asso(asso_list, function(asso_list) {
+        parse_asso2(event, asso_list, function (event) {
+            /* TODO
+            Problème ici, les events ne remonte pas jusqu'ici, la fonction res.json est exécutée plusieurs fois.
+            */
+            console.log(event[1]);
+            res.json(event);
+        });
+
+    });
+})
 
 app.listen('8081')
 exports = module.exports = app;
@@ -70,4 +105,45 @@ function parse_utc(events, callback) {
             callback(events);
         }
     });
+}
+
+// list all the asso_login
+function list_asso(asso_list, callback) {
+    var url = 'https://assos.utc.fr/asso/json';
+
+    request.get(url, function (error, response, data) {
+        if(!error) {
+            var obj = JSON.parse(data);
+            for(var i = 0; i < obj.length; ++i) {
+                asso_list.push(obj[i].login);
+            }
+            callback(asso_list);
+        }
+    });
+}
+
+// Get all the asso event
+function parse_asso2(event, asso_list, callback) {
+
+    var url = 'https://assos.utc.fr/asso/events/';
+
+    for(var i = 0; i < asso_list.length; i++) {
+        var url_asso = url + asso_list[i] + '/json';
+        request.get(url_asso, function (error, response, data) {
+            if(!error) {
+                try
+                {
+                    var obj = JSON.parse(data);
+                    for(var j = 0; j < obj.length; ++j) {
+                        event.push(obj[j]);
+                }
+                    callback(event);
+                }
+                catch(err)
+                {
+                    //Not jSON
+                }
+            }
+        });
+    }
 }
