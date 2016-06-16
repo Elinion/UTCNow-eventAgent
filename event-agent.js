@@ -1,3 +1,9 @@
+//Configuration variables
+var env = process.env.NODE_ENV || 'development';
+var config = require('./config')[env];
+// usage exemple : server.listen(config.server.port);
+
+// Modules
 var express = require('express');
 var fs = require('fs');
 var request = require('request');
@@ -9,7 +15,7 @@ var icalendar = require('icalendar');
 var CronJob = require('cron').CronJob;
 
 // Schedule start function : https://www.npmjs.com/package/cron
-var job = new CronJob('11 00 00 * * 1-7', function() {
+var job = new CronJob('11 00 00 * * 1-7', function () {
         /*TODO
          * Scrapping execution to be done here
          */
@@ -21,14 +27,30 @@ var job = new CronJob('11 00 00 * * 1-7', function() {
 );
 
 
-app.get('/', function(req, res) {
+app.get('/', function (req, res) {
 
     var events = [];
-    parse_asso(events, function(events) {
-        parse_utc(events, function(events) {
-            res.json(events);
+    parse_asso(events, function (events) {
+        // parse_utc(events, function(events) {
+        // res.json(events);
+        // });
+        events.forEach(function (obj) {
+            // Parameters for the API
+            var name = 'name=' + obj.name;
+            var description = 'desc=' + (obj.description || 'no description');
+            var start = 'start=' + '0';
+            var end = 'end=' + '0';
+            var apiUrl = config.server.host + ':' + config.server.port + '/api/events?' + name + '&' + start + '&' + end + '&' + description;
+            apiUrl = encodeURI(apiUrl);
+
+            // Print API call for debug purposes
+            console.log('API call: ' + apiUrl);
+
+            // Use server API to update database
+            request.post(apiUrl).form({key:'value'});
         });
-        res.json(events);
+
+        res.send();
     });
 
 });
@@ -39,11 +61,11 @@ app.get('/asso', function (req, res) {
 
     var asso_list = [];
     var event = [];
-    list_asso(asso_list, function(asso_list) {
+    list_asso(asso_list, function (asso_list) {
         parse_asso2(event, asso_list, function (event) {
             /* TODO
-            Problème ici, les events ne remonte pas jusqu'ici, la fonction res.json est exécutée plusieurs fois.
-            */
+             Problème ici, les events ne remonte pas jusqu'ici, la fonction res.json est exécutée plusieurs fois.
+             */
             console.log(event[1]);
             res.json(event);
         });
@@ -58,13 +80,13 @@ exports = module.exports = app;
 function parse_asso(events, callback) {
     var url = 'http://assos.utc.fr';
 
-    request.get(url, function(error, response, html) {
+    request.get(url, function (error, response, html) {
         if (!error) {
             var $ = cheerio.load(html);
 
             var events_html = $('#calendrier .carousel-inner .event');
 
-            events_html.each(function(i, element) {
+            events_html.each(function (i, element) {
                 var e = {};
                 e.name = $(this).find('.media-heading a').text();
                 e.description = $(this).find('p').first().text();
@@ -85,11 +107,11 @@ function parse_asso(events, callback) {
 function parse_utc(events, callback) {
     var url = 'http://actualites.utc.fr/?plugin=all-in-one-event-calendar&controller=ai1ec_exporter_controller&action=export_events&no_html=true';
 
-    request.get(url, function(error, response, data) {
+    request.get(url, function (error, response, data) {
         if (!error) {
             var ical = icalendar.parse_calendar(data);
 
-            ical.events().forEach(function(element, index) {
+            ical.events().forEach(function (element, index) {
                 var e = {};
                 e.name = element.getPropertyValue('SUMMARY');
                 e.description = element.getPropertyValue('DESCRIPTION');
@@ -112,9 +134,9 @@ function list_asso(asso_list, callback) {
     var url = 'https://assos.utc.fr/asso/json';
 
     request.get(url, function (error, response, data) {
-        if(!error) {
+        if (!error) {
             var obj = JSON.parse(data);
-            for(var i = 0; i < obj.length; ++i) {
+            for (var i = 0; i < obj.length; ++i) {
                 asso_list.push(obj[i].login);
             }
             callback(asso_list);
@@ -127,20 +149,18 @@ function parse_asso2(event, asso_list, callback) {
 
     var url = 'https://assos.utc.fr/asso/events/';
 
-    for(var i = 0; i < asso_list.length; i++) {
+    for (var i = 0; i < asso_list.length; i++) {
         var url_asso = url + asso_list[i] + '/json';
         request.get(url_asso, function (error, response, data) {
-            if(!error) {
-                try
-                {
+            if (!error) {
+                try {
                     var obj = JSON.parse(data);
-                    for(var j = 0; j < obj.length; ++j) {
+                    for (var j = 0; j < obj.length; ++j) {
                         event.push(obj[j]);
-                }
+                    }
                     callback(event);
                 }
-                catch(err)
-                {
+                catch (err) {
                     //Not jSON
                 }
             }
